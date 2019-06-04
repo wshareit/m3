@@ -58,6 +58,51 @@ type IndexedErrorHandler interface {
 	HandleError(index int, err error)
 }
 
+// BlockLeasers is a collection of all
+type BlockLeasers interface {
+	// Lease would add a lease.
+	Lease(descriptor BlockDescriptor, leaser BlockLeaser) error
+
+	// ReleaseLeases would call each BlockLeaser and ask them to release a block,
+	// Note: Hopefully no more leasers would reopen leases on the blocks before you
+	// delete them if you intend to delete them.
+	// Possibly this could also take a func() that gets run during guarantee the block
+	// will not get re-leased but has been released from all leasers?
+	// e.g. ReleaseLeasesAndDo(descriptors []BlockDescriptor, fn func())
+	ReleaseLeases(descriptors []BlockDescriptor) error
+}
+
+type BlockDescriptor struct {
+	Namespace   ident.ID
+	Shard       int
+	BlockStart  time.Time
+	VolumeIndex int
+	IsSnapshot  bool // hm do we need a SnapshotLeasers, etc or is this supposed to work for this too?
+	// others?
+}
+
+// BlockLeaser would be called each time something opens a lease for a block.
+type BlockLeaser interface {
+	Release(descriptor BlockDescriptor) error
+}
+
+type IndexSegmentLeasers interface {
+	Lease(descriptor IndexSegmentDescriptor, leaser IndexSegmentLeaser)
+
+	ReleaseLeases(descriptors []IndexSegmentDescriptor) error
+}
+
+type IndexSegmentDescriptor struct {
+	Namespace   ident.ID
+	BlockStart  time.Time
+	VolumeIndex int
+	// others?
+}
+
+type IndexSegmentLeaser interface {
+	Release(descriptor IndexSegmentDescriptor) error
+}
+
 // Database is a time series database.
 type Database interface {
 	// Options returns the database options.
