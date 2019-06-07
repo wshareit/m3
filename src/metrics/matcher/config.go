@@ -26,11 +26,9 @@ import (
 
 	"github.com/m3db/m3/src/cluster/client"
 	"github.com/m3db/m3/src/cluster/kv"
-	"github.com/m3db/m3/src/metrics/filters"
 	"github.com/m3db/m3/src/metrics/matcher/cache"
 	"github.com/m3db/m3/src/metrics/metric/id"
 	"github.com/m3db/m3/src/metrics/metric/id/m3"
-	"github.com/m3db/m3/src/metrics/rules"
 	"github.com/m3db/m3/src/x/clock"
 	"github.com/m3db/m3/src/x/instrument"
 	"github.com/m3db/m3/src/x/pool"
@@ -103,26 +101,8 @@ func (cfg *Configuration) NewOptions(
 	sortedTagIteratorPool.Init(func() id.SortedTagIterator {
 		return m3.NewPooledSortedTagIterator(nil, sortedTagIteratorPool)
 	})
-	sortedTagIteratorFn := func(tagPairs []byte) id.SortedTagIterator {
-		it := sortedTagIteratorPool.Get()
-		it.Reset(tagPairs)
-		return it
-	}
-	tagsFilterOptions := filters.TagsFilterOptions{
-		NameTagKey:          []byte(cfg.NameTagKey),
-		NameAndTagsFn:       m3.NameAndTags,
-		SortedTagIteratorFn: sortedTagIteratorFn,
-	}
 
-	isRollupIDFn := func(name []byte, tags []byte) bool {
-		return m3.IsRollupID(name, tags, sortedTagIteratorPool)
-	}
-
-	ruleSetOpts := rules.NewOptions().
-		SetTagsFilterOptions(tagsFilterOptions).
-		SetNewRollupIDFn(m3.NewRollupID).
-		SetIsRollupIDFn(isRollupIDFn)
-
+	ruleSetOpts := m3.NewRulesOptions([]byte(cfg.NameTagKey), sortedTagIteratorPool)
 	// Configure ruleset key function.
 	ruleSetKeyFn := func(namespace []byte) string {
 		return fmt.Sprintf(cfg.RuleSetKeyFmt, namespace)

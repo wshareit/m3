@@ -36,7 +36,9 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/m3db/m3/src/metrics/filters"
 	"github.com/m3db/m3/src/metrics/metric/id"
+	"github.com/m3db/m3/src/metrics/rules"
 )
 
 const (
@@ -99,6 +101,36 @@ func IsRollupID(name []byte, tags []byte, iterPool id.SortedTagIteratorPool) boo
 		}
 	}
 	return false
+}
+
+// NewRulesOptions returns configuration for rules using M3 functions to interpret ids.
+// Caller may optionally pass in a sorted tag iterator pool for efficiency reasons.
+func NewRulesOptions(nameTagKey []byte, iterPool id.SortedTagIteratorPool) rules.Options {
+	sortedTagIteratorFn := func(tagPairs []byte) id.SortedTagIterator {
+		if iterPool == nil {
+			return NewSortedTagIterator(tagPairs)
+		}
+
+		it := iterPool.Get()
+		it.Reset(tagPairs)
+		return it
+	}
+
+	tagsFilterOptions := filters.TagsFilterOptions{
+		NameTagKey:          nameTagKey,
+		NameAndTagsFn:       NameAndTags,
+		SortedTagIteratorFn: sortedTagIteratorFn,
+	}
+
+	isRollupIDFn := func(name []byte, tags []byte) bool {
+		return IsRollupID(name, tags, iterPool)
+	}
+
+	return rules.NewOptions().
+		SetTagsFilterOptions(tagsFilterOptions).
+		SetNewRollupIDFn(NewRollupID).
+		SetIsRollupIDFn(isRollupIDFn)
+
 }
 
 // TODO(xichen): pool the mids.

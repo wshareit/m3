@@ -187,14 +187,17 @@ func NewRuleSetFromProto(version int, rs *rulepb.RuleSet, opts Options) (RuleSet
 }
 
 // NewEmptyRuleSet returns an empty ruleset to be used with a new namespace.
-func NewEmptyRuleSet(namespaceName string, meta UpdateMetadata) MutableRuleSet {
+func NewEmptyRuleSet(namespaceName string, meta UpdateMetadata, opts Options) MutableRuleSet {
 	rs := &ruleSet{
-		uuid:         uuid.NewUUID().String(),
-		version:      kv.UninitializedVersion,
-		namespace:    []byte(namespaceName),
-		tombstoned:   false,
-		mappingRules: make([]*mappingRule, 0),
-		rollupRules:  make([]*rollupRule, 0),
+		uuid:           uuid.NewUUID().String(),
+		version:        kv.UninitializedVersion,
+		namespace:      []byte(namespaceName),
+		tombstoned:     false,
+		mappingRules:   make([]*mappingRule, 0),
+		rollupRules:    make([]*rollupRule, 0),
+		tagsFilterOpts: opts.TagsFilterOptions(),
+		newRollupIDFn:  opts.NewRollupIDFn(),
+		isRollupIDFn:   opts.IsRollupIDFn(),
 	}
 	rs.updateMetadata(meta)
 	return rs
@@ -414,7 +417,7 @@ func (rs *ruleSet) AddRollupRule(rrv view.RollupRule, meta UpdateMetadata) (stri
 	}
 	targets := newRollupTargetsFromView(rrv.Targets)
 	if err == errRuleNotFound {
-		r = newEmptyRollupRule()
+		r = newEmptyRollupRule(rs.tagsFilterOpts)
 		if err = r.addSnapshot(
 			rrv.Name,
 			rrv.Filter,

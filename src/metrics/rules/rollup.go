@@ -84,11 +84,7 @@ func newRollupRuleSnapshotFromProto(
 		return nil, errNoRollupTargetsInRollupRuleSnapshot
 	}
 
-	filterValues, err := filters.ParseTagFilterValueMap(r.Filter)
-	if err != nil {
-		return nil, err
-	}
-	filter, err := filters.NewTagsFilter(filterValues, filters.Conjunction, opts)
+	filter, err := parseFilter(r.Filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +99,14 @@ func newRollupRuleSnapshotFromProto(
 		r.LastUpdatedAtNanos,
 		r.LastUpdatedBy,
 	), nil
+}
+
+func parseFilter(rawFilter string, opts filters.TagsFilterOptions) (filters.Filter, error) {
+	filterValues, err := filters.ParseTagFilterValueMap(rawFilter)
+	if err != nil {
+		return nil, err
+	}
+	return filters.NewTagsFilter(filterValues, filters.Conjunction, opts)
 }
 
 func newRollupRuleSnapshotFromFields(
@@ -202,10 +206,11 @@ func (rrs *rollupRuleSnapshot) proto() (*rulepb.RollupRuleSnapshot, error) {
 type rollupRule struct {
 	uuid      string
 	snapshots []*rollupRuleSnapshot
+	opts      filters.TagsFilterOptions
 }
 
-func newEmptyRollupRule() *rollupRule {
-	return &rollupRule{uuid: uuid.New()}
+func newEmptyRollupRule(opts filters.TagsFilterOptions) *rollupRule {
+	return &rollupRule{uuid: uuid.New(), opts: opts}
 }
 
 func newRollupRuleFromProto(
@@ -226,6 +231,7 @@ func newRollupRuleFromProto(
 	return &rollupRule{
 		uuid:      rc.Uuid,
 		snapshots: snapshots,
+		opts:      opts,
 	}, nil
 }
 
@@ -311,12 +317,18 @@ func (rc *rollupRule) addSnapshot(
 	rollupTargets []rollupTarget,
 	meta UpdateMetadata,
 ) error {
+
+	filter, err := parseFilter(rawFilter, rc.opts)
+	if err != nil {
+		return err
+	}
+
 	snapshot, err := newRollupRuleSnapshotFromFields(
 		name,
 		meta.cutoverNanos,
 		rawFilter,
 		rollupTargets,
-		nil,
+		filter,
 		meta.updatedAtNanos,
 		meta.updatedBy,
 	)

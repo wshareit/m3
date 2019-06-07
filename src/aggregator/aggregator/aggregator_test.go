@@ -1006,8 +1006,11 @@ func TestAggregatorAddTimedMetrics(t *testing.T) {
 }
 
 func testAggregator(t *testing.T, ctrl *gomock.Controller) (*aggregator, kv.Store) {
-	proto := testStagedPlacementProtoWithNumShards(t, testInstanceID, testShardSetID, testNumShards)
-	return testAggregatorWithCustomPlacements(t, ctrl, proto)
+	return testAggregatorWithCustomPlacements(t, ctrl, defaultStagedPlacementProto(t))
+}
+
+func defaultStagedPlacementProto(t *testing.T) *placementpb.PlacementSnapshots {
+	return testStagedPlacementProtoWithNumShards(t, testInstanceID, testShardSetID, testNumShards)
 }
 
 func testAggregatorWithCustomPlacements(
@@ -1081,6 +1084,16 @@ func testStagedPlacementProtoWithCustomShards(
 	stagedPlacementProto, err := testStagedPlacement.Proto()
 	require.NoError(t, err)
 	return stagedPlacementProto
+}
+
+func defaultPlacementManager(t *testing.T) PlacementManager {
+	proto := defaultStagedPlacementProto(t)
+
+	watcher, _ := testPlacementWatcherWithPlacementProto(t, testPlacementKey, proto)
+	placementManagerOpts := NewPlacementManagerOptions().
+		SetInstanceID(testInstanceID).
+		SetStagedPlacementWatcher(watcher)
+	return NewPlacementManager(placementManagerOpts)
 }
 
 func testOptions(ctrl *gomock.Controller) Options {

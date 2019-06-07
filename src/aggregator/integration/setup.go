@@ -24,13 +24,11 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/m3db/m3/src/aggregator/aggregator"
 	"github.com/m3db/m3/src/aggregator/aggregator/handler"
-	"github.com/m3db/m3/src/aggregator/aggregator/handler/writer"
 	aggclient "github.com/m3db/m3/src/aggregator/client"
 	"github.com/m3db/m3/src/aggregator/runtime"
 	httpserver "github.com/m3db/m3/src/aggregator/server/http"
@@ -45,7 +43,6 @@ import (
 	xsync "github.com/m3db/m3/src/x/sync"
 
 	"github.com/stretchr/testify/require"
-	"github.com/uber-go/tally"
 )
 
 var (
@@ -61,14 +58,12 @@ type testServerSetup struct {
 	httpServerOpts   httpserver.Options
 	aggregator       aggregator.Aggregator
 	aggregatorOpts   aggregator.Options
-	handler          handler.Handler
+	handler          *handler.CapturingHandler
 	electionKey      string
 	leaderValue      string
 	leaderService    services.LeaderService
 	electionCluster  *testCluster
 	workerPool       xsync.WorkerPool
-	results          *[]aggregated.MetricWithStoragePolicy
-	resultLock       *sync.Mutex
 
 	// Signals.
 	doneCh   chan struct{}
@@ -164,11 +159,7 @@ func newTestServerSetup(t *testing.T, opts testServerOptions) *testServerSetup {
 	aggregatorOpts = aggregatorOpts.SetAdminClient(adminClient)
 
 	// Set up the handler.
-	var (
-		results    []aggregated.MetricWithStoragePolicy
-		resultLock sync.Mutex
-	)
-	handler := &capturingHandler{results: &results, resultLock: &resultLock}
+	handler := handler.NewCapturingHandler()
 	aggregatorOpts = aggregatorOpts.SetFlushHandler(handler)
 
 	// Set up entry pool.
@@ -211,8 +202,6 @@ func newTestServerSetup(t *testing.T, opts testServerOptions) *testServerSetup {
 		leaderService:    leaderService,
 		electionCluster:  electionCluster,
 		workerPool:       workerPool,
-		results:          &results,
-		resultLock:       &resultLock,
 		doneCh:           make(chan struct{}),
 		closedCh:         make(chan struct{}),
 	}
@@ -289,8 +278,8 @@ func (ts *testServerSetup) waitUntilLeader() error {
 }
 
 func (ts *testServerSetup) sortedResults() []aggregated.MetricWithStoragePolicy {
-	sort.Sort(byTimeIDPolicyAscending(*ts.results))
-	return *ts.results
+	sort.Sort(byTimeIDPolicyAscending(ts.handler.Results()))
+	return ts.handler.Results()
 }
 
 func (ts *testServerSetup) stopServer() error {
@@ -307,41 +296,3 @@ func (ts *testServerSetup) stopServer() error {
 func (ts *testServerSetup) close() {
 	ts.electionCluster.Close()
 }
-
-type capturingWriter struct {
-	results    *[]aggregated.MetricWithStoragePolicy
-	resultLock *sync.Mutex
-}
-
-func (w *capturingWriter) Write(mp aggregated.ChunkedMetricWithStoragePolicy) error {
-	w.resultLock.Lock()
-	var fullID []byte
-	fullID = append(fullID, mp.ChunkedID.Prefix...)
-	fullID = append(fullID, mp.ChunkedID.Data...)
-	fullID = append(fullID, mp.ChunkedID.Suffix...)
-	metric := aggregated.Metric{
-		ID:        fullID,
-		TimeNanos: mp.TimeNanos,
-		Value:     mp.Value,
-	}
-	*w.results = append(*w.results, aggregated.MetricWithStoragePolicy{
-		Metric:        metric,
-		StoragePolicy: mp.StoragePolicy,
-	})
-	w.resultLock.Unlock()
-	return nil
-}
-
-func (w *capturingWriter) Flush() error { return nil }
-func (w *capturingWriter) Close() error { return nil }
-
-type capturingHandler struct {
-	results    *[]aggregated.MetricWithStoragePolicy
-	resultLock *sync.Mutex
-}
-
-func (h *capturingHandler) NewWriter(tally.Scope) (writer.Writer, error) {
-	return &capturingWriter{results: h.results, resultLock: h.resultLock}, nil
-}
-
-func (h *capturingHandler) Close() {}
