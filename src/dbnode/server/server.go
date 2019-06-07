@@ -152,6 +152,10 @@ func Run(runOpts RunOptions) {
 	}
 	defer logger.Sync()
 
+	if err := xos.EnsureCapSysResource(logger); err != nil {
+		logger.Warn("error ensure cap_sys_source", zap.Error(err))
+	}
+
 	raiseLimits := strings.TrimSpace(os.Getenv(raiseProcessLimitsEnvVar))
 	if raiseLimits == raiseProcessLimitsEnvVarTrue {
 		// Raise fd limits to nr_open system limit

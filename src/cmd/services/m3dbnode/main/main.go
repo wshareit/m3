@@ -40,10 +40,19 @@ import (
 
 var (
 	configFile = flag.String("f", "", "configuration file")
+	help       = flag.Bool("h", false, "print usage and exit")
 )
 
 func main() {
 	flag.Parse()
+
+	// In our entrypoint script we run `m3dbnode -h` and make sure it exits 0 to
+	// see cap_sys_resource. Must Exit(0) here so we know non-zero exit means we
+	// couldn't start up with cap_sys_resource.
+	if *help {
+		flag.Usage()
+		os.Exit(0)
+	}
 
 	if len(*configFile) == 0 {
 		flag.Usage()
