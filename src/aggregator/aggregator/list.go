@@ -645,6 +645,7 @@ func newForwardedMetricList(
 	targetNanosFn := func(nowNanos int64) int64 {
 		return nowNanos - maxLatenessAllowed.Nanoseconds()
 	}
+
 	l, err := newBaseMetricList(
 		shard,
 		resolution,

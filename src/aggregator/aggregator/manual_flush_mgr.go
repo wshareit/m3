@@ -22,7 +22,6 @@ package aggregator
 
 import (
 	"fmt"
-	"math"
 	"sync"
 )
 
@@ -84,15 +83,26 @@ func (*ManualFlushManager) Close() error {
 	return nil
 }
 
-func (mgr *ManualFlushManager) Flush() error {
+func (mgr *ManualFlushManager) Flush(req flushRequest) error {
+	// use a copy of the current flusher list so that we can handle flushes which
+	// themselves add metrics (causing deadlock).
+	// This can occur when using an aggregator which "forwards" to itself.
+	snapshot := mgr.flusherSnapshot()
+	i := 0
+	for _, flusher := range snapshot {
+		flusher.Flush(req)
+		i++
+	}
+	return nil
+}
+
+func (mgr *ManualFlushManager) flusherSnapshot() map[metricListID]flushingMetricList {
 	mgr.mu.RLock()
 	defer mgr.mu.RUnlock()
 
-	for _, flusher := range mgr.flushers {
-		flusher.Flush(flushRequest{
-			CutoverNanos: 0,
-			CutoffNanos:  math.MaxInt64,
-		})
+	snapshot := make(map[metricListID]flushingMetricList, len(mgr.flushers))
+	for k, flusher := range mgr.flushers {
+		snapshot[k] = flusher
 	}
-	return nil
+	return snapshot
 }

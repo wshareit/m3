@@ -280,7 +280,10 @@ func (as *activeRuleSet) rollupResultsFor(id []byte, timeNanos int64) rollupResu
 		}
 	}
 	// NB: could log the matching error here if needed.
-	res, _ := as.toRollupResults(id, cutoverNanos, rollupTargets)
+	res, err := as.toRollupResults(id, cutoverNanos, rollupTargets)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 	return res
 }
 

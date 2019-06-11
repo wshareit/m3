@@ -77,8 +77,8 @@ const (
 	discardType
 )
 
-// A flushLocalMetricFn flushes an aggregated metric datapoint locally by either
-// consuming or discarding it. Processing of the datapoint is completed once it is
+// A flushLocalMetricFn flushes an aggregated metric aggDatapoint locally by either
+// consuming or discarding it. Processing of the aggDatapoint is completed once it is
 // flushed.
 type flushLocalMetricFn func(
 	idPrefix []byte,
@@ -89,9 +89,9 @@ type flushLocalMetricFn func(
 	sp policy.StoragePolicy,
 )
 
-// A flushForwardedMetricFn flushes an aggregated metric datapoint eligible for
+// A flushForwardedMetricFn flushes an aggregated metric aggDatapoint eligible for
 // forwarding by either forwarding it (potentially to a different aggregation
-// server) or dropping it. Processing of the datapoint continues after it is
+// server) or dropping it. Processing of the aggDatapoint continues after it is
 // flushed as required by the pipeline.
 type flushForwardedMetricFn func(
 	writeFn writeForwardedMetricFn,
