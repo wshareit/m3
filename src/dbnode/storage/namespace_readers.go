@@ -290,12 +290,28 @@ func (m *namespaceReaderManager) get(
 		position:   position,
 	}
 
-	lookup, err := m.cachedReaderForKey(key)
+	// We have a closed reader from the cache (either a cached closed
+	// reader or newly allocated, either way need to prepare it)
+	// reader := lookup.closedReader
+	reader, err := m.newReaderFn(m.bytesPool, m.fsOpts)
 	if err != nil {
 		return nil, err
 	}
-	if reader := lookup.openReader; reader != nil {
-		return reader, nil // Found an open reader for the position
+	// 	// DataFiles returns a slice of all the names for all the fileset files
+	// // for a given namespace and shard combination.
+	// func DataFiles(filePathPrefix string, namespace ident.ID, shard uint32) (FileSetFilesSlice, error) {
+	// 	return filesetFiles(filesetFilesSelector{
+	// 		fileSetType:    persist.FileSetFlushType,
+	// 		contentType:    persist.FileSetDataContentType,
+	// 		filePathPrefix: filePathPrefix,
+	// 		namespace:      namespace,
+	// 		shard:          shard,
+	// 		pattern:        filesetFilePattern,
+	// 	})
+	// }
+	dataFiles, err := fs.DataFiles(m.fsOpts.FilePathPrefix(), m.namespace.ID(), shard)
+	if err != nil {
+		panic(err)
 	}
 
 	// We have a closed reader from the cache (either a cached closed
