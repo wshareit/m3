@@ -301,8 +301,6 @@ func (m *namespaceReaderManager) get(
 	// We have a closed reader from the cache (either a cached closed
 	// reader or newly allocated, either way need to prepare it)
 	reader := lookup.closedReader
-	// TODO(juchan): get the actual volume here.
-	vol := 0
 	openOpts := fs.DataReaderOpenOptions{
 		Identifier: fs.FileSetFileIdentifier{
 			Namespace:   m.namespace.ID(),
