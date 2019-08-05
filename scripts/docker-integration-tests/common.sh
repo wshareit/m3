@@ -144,7 +144,7 @@ function wait_for_db_init {
   ATTEMPTS=10 MAX_TIMEOUT=4 TIMEOUT=1 retry_with_backoff  \
     '[ "$(curl -sSf 0.0.0.0:'"${coordinator_port}"'/api/v1/placement | jq .placement.instances.m3db_local.id)" == \"m3db_local\" ]'
 
-  wait_for_namespaces_and_bootstrapped
+  wait_for_namespaces
 
   echo "Wait until bootstrapped"
   ATTEMPTS=100 MAX_TIMEOUT=4 TIMEOUT=1 retry_with_backoff  \
