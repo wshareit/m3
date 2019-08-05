@@ -30,6 +30,7 @@ import (
 	"github.com/m3db/m3/src/dbnode/environment"
 	"github.com/m3db/m3/src/dbnode/storage"
 	"github.com/m3db/m3/src/dbnode/storage/bootstrap/bootstrapper/commitlog"
+	"github.com/m3db/m3/src/dbnode/storage/bootstrap/result"
 	"github.com/m3db/m3/src/dbnode/topology"
 	xconfig "github.com/m3db/m3/src/x/config"
 	"github.com/m3db/m3/src/x/instrument"
@@ -983,6 +984,6 @@ db:
 	adminClient := client.NewMockAdminClient(ctrl)
 
 	_, err = cfg.DB.Bootstrap.New(validator,
-		storage.DefaultTestOptions(), mapProvider, origin, adminClient)
+		result.NewOptions(), storage.DefaultTestOptions(), mapProvider, origin, adminClient)
 	require.NoError(t, err)
 }
