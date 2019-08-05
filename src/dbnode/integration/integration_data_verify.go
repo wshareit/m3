@@ -221,7 +221,6 @@ func containsSeries(ts *testSetup, namespace, seriesID ident.ID, start, end time
 	req.RangeEnd = xtime.ToNormalizedTime(end, time.Second)
 	req.ResultTimeType = rpc.TimeType_UNIX_SECONDS
 	fetched, err := ts.fetch(req)
-	fmt.Println(fetched)
 	return len(fetched) != 0, err
 }
 

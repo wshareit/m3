@@ -238,7 +238,6 @@ func (it *filteredBlocksMetadataIter) Next() bool {
 		// Set to nil so it doesn't get closed again later and trigger a double-put pooling bug.
 		it.res[it.resIdx].Tags = nil
 	}
-	fmt.Println("after", it.res[it.resIdx].Tags)
 	it.metadata = NewMetadata(it.id, tags, block.Start,
 		block.Size, block.Checksum, block.LastRead)
 	it.blockIdx++

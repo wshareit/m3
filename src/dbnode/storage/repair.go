@@ -415,6 +415,19 @@ func (r *dbRepairer) Stop() {
 	r.closedLock.Unlock()
 }
 
+// Repair will analyze the current repair state for each namespace/blockStart combination and pick one blockStart
+// per namespace to repair. It will prioritize blocks that have never been repaired over those that have been
+// repaired before, and it will priotize more recent blocks over older ones. If all blocks have been repaired
+// before then it will prioritize the least recently repaired block.
+//
+// The Repair function only attempts to repair one block at a time because this allows the background repair process
+// to run its prioritization logic more frequently. For example, if we attempted to repair all blocks in one pass,
+// even with appropriate backpressure, this could lead to situations where recent blocks are not repaired for a
+// substantial amount of time whereas with the current approach the longest delay between running the prioritization
+// logic is the amount of time it takes to repair one block for all shards.
+//
+// Long term we will want to move to a model that actually tracks state for individual shard/blockStart combinations,
+// not just blockStarts.
 func (r *dbRepairer) Repair() error {
 	// Don't attempt a repair if the database is not bootstrapped yet
 	if !r.database.IsBootstrapped() {
