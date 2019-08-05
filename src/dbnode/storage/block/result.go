@@ -21,7 +21,6 @@
 package block
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
