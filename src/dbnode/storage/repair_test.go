@@ -27,6 +27,7 @@ import (
 
 	"github.com/m3db/m3/src/dbnode/client"
 	"github.com/m3db/m3/src/dbnode/namespace"
+	"github.com/m3db/m3/src/dbnode/retention"
 	"github.com/m3db/m3/src/dbnode/storage/block"
 	"github.com/m3db/m3/src/dbnode/storage/repair"
 	"github.com/m3db/m3/src/dbnode/topology"
@@ -278,4 +279,129 @@ func TestDatabaseShardRepairerRepair(t *testing.T) {
 		{Host: topology.NewHost("1", "addr1"), Metadata: inputBlocks[1].Metadata},
 	}
 	require.Equal(t, expected, currBlock.Metadata())
+}
+
+type expectedRepair struct {
+	repairRange xtime.Range
+}
+
+func TestDatabaseRepairPrioritizationLogic(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		rOpts = retention.NewOptions().
+			SetRetentionPeriod(retention.NewOptions().BlockSize() * 2)
+		nsOpts = namespace.NewOptions().
+			SetRetentionOptions(rOpts)
+		blockSize = rOpts.BlockSize()
+
+		// Set current time such that the previous block is flushable.
+		now = time.Now().Truncate(blockSize).Add(rOpts.BufferPast()).Add(time.Second)
+
+		flushTimeStart = retention.FlushTimeStart(rOpts, now)
+		flushTimeEnd   = retention.FlushTimeEnd(rOpts, now)
+
+		flushTimeStartNano = xtime.ToUnixNano(flushTimeStart)
+		flushTimeEndNano   = xtime.ToUnixNano(flushTimeEnd)
+	)
+	require.NoError(t, nsOpts.Validate())
+	// Ensure only two flushable blocks in retention to make test logic simpler.
+	require.Equal(t, blockSize, flushTimeEnd.Sub(flushTimeStart))
+
+	testCases := []struct {
+		title             string
+		repairState       repairStatesByNs
+		expectedNS1Repair expectedRepair
+		expectedNS2Repair expectedRepair
+	}{
+		{
+			title:             "repairs most recent block if no repair state",
+			expectedNS1Repair: expectedRepair{xtime.Range{Start: flushTimeEnd, End: flushTimeEnd.Add(blockSize)}},
+			expectedNS2Repair: expectedRepair{xtime.Range{Start: flushTimeEnd, End: flushTimeEnd.Add(blockSize)}},
+		},
+		{
+			title: "repairs next unrepaired block in reverse order if some (but not all) blocks have been repaired",
+			repairState: repairStatesByNs{
+				"ns1": namespaceRepairStateByTime{
+					flushTimeEndNano: repairState{
+						Status:      repairSuccess,
+						LastAttempt: time.Time{},
+					},
+				},
+				"ns2": namespaceRepairStateByTime{
+					flushTimeEndNano: repairState{
+						Status:      repairSuccess,
+						LastAttempt: time.Time{},
+					},
+				},
+			},
+			expectedNS1Repair: expectedRepair{xtime.Range{Start: flushTimeStart, End: flushTimeStart.Add(blockSize)}},
+			expectedNS2Repair: expectedRepair{xtime.Range{Start: flushTimeStart, End: flushTimeStart.Add(blockSize)}},
+		},
+		{
+			title: "repairs least recently repaired block if all blocks have been repaired",
+			repairState: repairStatesByNs{
+				"ns1": namespaceRepairStateByTime{
+					flushTimeStartNano: repairState{
+						Status:      repairSuccess,
+						LastAttempt: time.Time{},
+					},
+					flushTimeEndNano: repairState{
+						Status:      repairSuccess,
+						LastAttempt: time.Time{}.Add(time.Second),
+					},
+				},
+				"ns2": namespaceRepairStateByTime{
+					flushTimeStartNano: repairState{
+						Status:      repairSuccess,
+						LastAttempt: time.Time{},
+					},
+					flushTimeEndNano: repairState{
+						Status:      repairSuccess,
+						LastAttempt: time.Time{}.Add(time.Second),
+					},
+				},
+			},
+			expectedNS1Repair: expectedRepair{xtime.Range{Start: flushTimeStart, End: flushTimeStart.Add(blockSize)}},
+			expectedNS2Repair: expectedRepair{xtime.Range{Start: flushTimeStart, End: flushTimeStart.Add(blockSize)}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.title, func(t *testing.T) {
+			opts := DefaultTestOptions().SetRepairOptions(testRepairOptions(ctrl))
+			mockDatabase := NewMockdatabase(ctrl)
+
+			databaseRepairer, err := newDatabaseRepairer(mockDatabase, opts)
+			require.NoError(t, err)
+			repairer := databaseRepairer.(*dbRepairer)
+			repairer.nowFn = func() time.Time {
+				return now
+			}
+			if tc.repairState == nil {
+				tc.repairState = repairStatesByNs{}
+			}
+			repairer.repairStatesByNs = tc.repairState
+
+			mockDatabase.EXPECT().IsBootstrapped().Return(true)
+
+			var (
+				ns1        = NewMockdatabaseNamespace(ctrl)
+				ns2        = NewMockdatabaseNamespace(ctrl)
+				namespaces = []databaseNamespace{ns1, ns2}
+			)
+			ns1.EXPECT().Options().Return(nsOpts).AnyTimes()
+			ns2.EXPECT().Options().Return(nsOpts).AnyTimes()
+
+			ns1.EXPECT().ID().Return(ident.StringID("ns1")).AnyTimes()
+			ns2.EXPECT().ID().Return(ident.StringID("ns2")).AnyTimes()
+
+			ns1.EXPECT().Repair(gomock.Any(), tc.expectedNS1Repair.repairRange)
+			ns2.EXPECT().Repair(gomock.Any(), tc.expectedNS2Repair.repairRange)
+
+			mockDatabase.EXPECT().GetOwnedNamespaces().Return(namespaces, nil)
+			require.Nil(t, repairer.Repair())
+		})
+	}
 }
