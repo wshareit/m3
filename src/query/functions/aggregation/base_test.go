@@ -92,8 +92,8 @@ func TestFunctionFilteringWithA(t *testing.T) {
 		{Name: typeBytes, Tags: test.TagSliceToTags([]models.Tag{{Name: []byte("a"), Value: []byte("2")}})},
 		{Name: typeBytes, Tags: models.EmptyTags()},
 	}
-	expectedMetaTags := models.EmptyTags()
 
+	expectedMetaTags := models.EmptyTags()
 	test.CompareValues(t, sink.Metas, expectedMetas, sink.Values, expected)
 	assert.Equal(t, bounds, sink.Meta.Bounds)
 	assert.Equal(t, expectedMetaTags.Tags, sink.Meta.Tags.Tags)
