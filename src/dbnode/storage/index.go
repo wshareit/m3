@@ -1352,7 +1352,7 @@ func (i *nsIndex) blocksForQueryWithRLock(queryRange xtime.Ranges) ([]index.Bloc
 		}
 
 		// Remove this range from the query range.
-		queryRange = queryRange.RemoveRange(blockRange)
+		queryRange.RemoveRange(blockRange)
 
 		blocks = append(blocks, block)
 	}
