@@ -70,6 +70,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+     _ "net/http/pprof"
 )
 
 const (
@@ -345,6 +346,10 @@ func Run(runOpts RunOptions) {
 				zap.String("address", listenAddress),
 				zap.Error(err))
 		}
+	}()
+	// pprof for memory
+	go func() {
+		http.ListenAndServe("0.0.0.0:8899", nil)
 	}()
 
 	if cfg.Ingest != nil {
