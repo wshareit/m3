@@ -92,6 +92,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.etcd.io/etcd/embed"
 	"go.uber.org/zap"
+	_ "net/http/pprof"
 )
 
 const (
@@ -211,6 +212,11 @@ func Run(runOpts RunOptions) {
 		logger.Fatal("could not acquire lock", zap.String("path", lockPath), zap.Error(err))
 	}
 	defer fslock.Release()
+
+	// pprof debug
+	go func() {
+		http.ListenAndServe("0.0.0.0:8899", nil)
+	}()
 
 	go bgValidateProcessLimits(logger)
 	debug.SetGCPercent(cfg.GCPercentage)
