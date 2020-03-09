@@ -40,8 +40,8 @@ var (
 
 // PromLabelsToM3Tags converts Prometheus labels to M3 tags
 func PromLabelsToM3Tags(
-	labels []prompb.Label,
-	tagOptions models.TagOptions,
+		labels []prompb.Label,
+		tagOptions models.TagOptions,
 ) models.Tags {
 	tags := models.NewTags(len(labels), tagOptions)
 	tagList := make([]models.Tag, 0, len(labels))
@@ -67,9 +67,12 @@ func PromLabelsToM3Tags(
 // PromSamplesToM3Datapoints converts Prometheus samples to M3 datapoints
 func PromSamplesToM3Datapoints(samples []prompb.Sample) ts.Datapoints {
 	datapoints := make(ts.Datapoints, 0, len(samples))
+	now := time.Now()
 	for _, sample := range samples {
-		timestamp := PromTimestampToTime(sample.Timestamp)
-		datapoints = append(datapoints, ts.Datapoint{Timestamp: timestamp, Value: sample.Value})
+
+		//timestamp := PromTimestampToTime(sample.Timestamp)
+		//datapoints = append(datapoints, ts.Datapoint{Timestamp: timestamp, Value: sample.Value})
+		datapoints = append(datapoints, ts.Datapoint{Timestamp: now, Value: sample.Value})
 	}
 
 	return datapoints
@@ -143,8 +146,8 @@ func TimeToPromTimestamp(timestamp time.Time) int64 {
 
 // FetchResultToPromResult converts fetch results from M3 to Prometheus result.
 func FetchResultToPromResult(
-	result *FetchResult,
-	keepEmpty bool,
+		result *FetchResult,
+		keepEmpty bool,
 ) *prompb.QueryResult {
 	// Perform bulk allocation upfront then convert to pointers afterwards
 	// to reduce total number of allocations. See BenchmarkFetchResultToPromResult
